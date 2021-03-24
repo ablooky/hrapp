@@ -1,0 +1,33 @@
+.main-header .logo {
+  font-family: 'Montserrat','Open Sans','Libre Baskerville', serif;
+  font-weight: bold;
+  font-size: 18px;
+  color: #e84545!important;
+ /* background-color: #903749!important;*/
+}
+.my_table .table>tbody>tr>td, .table>tbody>tr>th, .table>tfoot>tr>td, .table>tfoot>tr>th, .table>thead>tr>td, .table>thead>tr>th {
+        padding: 8px;
+        line-height: 1.42857143;
+        vertical-align: top;
+        border-top: 3px solid blue; 
+      }
+.participant_name_div {
+  font-family: 'Montserrat','Open Sans','Libre Baskerville', serif;
+  font-weight: bold;
+  font-size: 28px;
+  color: #3781AE;
+  text-align: left;
+  vertical-align: middle;
+}
+.participant_profile_div {
+  font-family: 'Montserrat','Open Sans','Libre Baskerville', serif;
+  font-weight: bold;
+  font-size: 18px;
+  color: #3781AE;
+  text-align: right;
+  vertical-align: middle;
+  border-right-color: #E9EF29;
+}
+.download_tables {
+  white-space: nowrap;
+}
