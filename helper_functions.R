@@ -1,23 +1,24 @@
 # helper_functions.R
 library(xlsx)
-library(dplyr)
+library(tidyverse)
 library(tidyr)
 library(plotly)
-library (ggplot2)
 library(reactable)
 library(sparkline)
 library(knitr)
+library (data.table)
 #library(pander)
 # Datasets ----
-# Preparing for import
-files_list <- list.files('data/client/')
-get_clients_list<-function(){
-  clients_list<-c()
-  files_list <- list.files('data/client/')
+# Preparing for import ----
+files_list <- list.files('data/year/')
+get_years_list<-function(){
+  years_list<-c()
+  files_list <- list.files('data/year/')
   for (x in 1:length(files_list)){
-    clients_list<-c(gsub('.xlsx','',files_list[x]),clients_list)
+    years_list<-c(gsub('.xlsx','',files_list[x]),years_list)
   }
-  return(clients_list)
+  years_list<-sort(years_list)
+  return(years_list)
 }
 add_dataset <- function(filename,sheetname,startrow) {
   read.xlsx2(
@@ -33,12 +34,12 @@ add_dataset <- function(filename,sheetname,startrow) {
   )
 }
 import_client_data <- function(client_name,sheetname,startrow) {
-  filename <- paste0('data/client/',client_name)
+  filename <- paste0('data/year/',client_name)
   ds <- add_dataset(filename,sheetname,startrow)
   return(ds)
 }
 
-# Importing profiles and survey results
+# Importing profiles and survey results ----
 get_categories_df<-function(){
   df<-raw_results<-import_client_data(files_list[1],'Headers',1)
   return(df)
@@ -160,6 +161,7 @@ generate_formatted_results<-function(raw_results){
   }
   return(results)
 }
+formatted_results<-generate_formatted_results(raw_results)
 generate_scored_results<-function (raw_results_transposed){
   add_score<-matrix(0,nrow=nrow(raw_results_transposed),ncol=1)
   colnames(add_score)<-'overall_score'
@@ -193,7 +195,7 @@ generate_final_dataset<-function(df){
   }
 }
 
-# Global variables
+# Global variables ----
 get_color_palette<-function(type='main'){
   cp<-c('#2B2E4A', '#e84545','#903749','#709fb0')
   if(type == 'blue'){ cp<-c('#413c69','#4a47a3','#709fb0','#a7c5eb')}
@@ -212,8 +214,8 @@ retrieve_questions_table<-function(raw_results){
   return(questions_table)
 }
 
-# Generate plots ----
-## summary analysis
+
+# Summary analysis #----
 convert_scores<-function(ds){
   for (i in 1:nrow(ds)){
     ds[i,]<- gsub(c(0),'DNK',ds[i,])
@@ -236,7 +238,7 @@ generate_scores_per_question<-function(df){
   
   return(df_scored)
 }
-summarize_score<-function(df,order_type){
+summarize_score<-function(df){
   t<-convert_scores(t(df))
   total_number_participants<-ncol(t)
   scored_df<-data.frame(rownames(t))
@@ -254,18 +256,21 @@ summarize_score<-function(df,order_type){
   }
 
   scored_df2<-cbind(scored_df,questions_table)
-  t_asc<-scored_df2[with(scored_df2,order(Percent_Favorability)), ]
-  t_desc<-scored_df2[with(scored_df2,order(-Percent_Favorability)), ]
-  results<-data.frame()
-  if(order_type=='lowest'){
-    results<-t_asc %>% slice(1:5)
-  }
-  if(order_type=='highest'){
-    results<-t_desc %>% slice(1:5)
-  }
+  #results_finalized<-scored_df2 %>% select(c(Question_number, Question_category,Question_desc,Percent_Favorability))
+  #names(results_finalized)<-c("Question #",'Category','Question','Favorability Percent Score')
+  results_finalized<-scored_df2 %>% select(c(Question_number,Question_desc,Percent_Favorability))
+  #results<-data.frame()
+  #if(order_type=='lowest'){
+  t_asc<-results_finalized[with(results_finalized,order(Percent_Favorability)), ]
+  t_desc<-results_finalized[with(results_finalized,order(-Percent_Favorability)), ] 
+  lowest_results<-t_asc %>% slice(1:5)  
+  lowest_results$Percent_Favorability= paste0(lowest_results$Percent_Favorability,'%')
+  highest_results<-t_desc %>% slice(1:5) 
+ highest_results$Percent_Favorability=paste0(highest_results$Percent_Favorability,'%')
+  # }
   #results_selected
-  results_finalized<-results %>% select(c(Question_number, Percent_Favorability,
-                                       Question_category,Question_desc))
+  names(lowest_results)<-c("Question #",'Question','Favorability Percent Score')
+  names(highest_results)<-c("Question #",'Question','Favorability Percent Score')
   #names(results)<-c('Question','Percent Favorability')
  # results_finalized<-results_selected 
   #  mutate(Question_number=gsub('Question_','',Question_number)) %>% 
@@ -273,10 +278,10 @@ summarize_score<-function(df,order_type){
   #results<-results[c('question_number','overall_question_score', 'Question_category','question_desc')]
   #results$overall_question_score<-round(results$overall_question_score,0)
   #results<-round_number(results,0)
-  names(results_finalized)<-c("Question #",'Favorability Percent Score','Category','Question')
-  #results_finalized<-results_finalized %>% select(`Question #`,`Favorability Percent Score`,Category,Question)
   
-  return(results_finalized)
+  #results_finalized<-results_finalized %>% select(`Question #`,`Favorability Percent Score`,Category,Question)
+  resultset<-list(lowest_results,highest_results)
+  return(resultset)
 }
 summarize_participation<-function(df){
   total_number_participants<-as.numeric(nrow(df))
@@ -441,7 +446,7 @@ summarize_favorability<-function(df){
   return(fig)
 }
 
-## Profile analysis ----
+# Profile analysis ----
 analyze_participant<-function(df,participant_name){
   participant_data<-list()
   #participant_name<-"Chantelle Fane"
@@ -866,7 +871,7 @@ generate_subset_df<-function(df,category){
   subset_df<-data.frame() #subset data 
   data<-data.frame(t(convert_scores(df)))
   data<-cbind(questions_table$Question_category,
-              questions_table$question_desc,
+              questions_table$Question_desc,
               data)
   names(data)[1]<-'Question_category'
   names(data)[2]<-'question'
@@ -887,7 +892,7 @@ generate_subset_df<-function(df,category){
 }
 make_reactable_df3<-function(df,participants_list){
   library(htmltools)
-  bar_chart <- function(label, width = "100%", height = "16px", fill = color_palette[1], background = NULL) {
+  bar_chart <- function(label, width = "100%", height = "16px", fill = color_palette[2], background = NULL) {
     bar <- div(style = list(background = fill, width = width, height = height))
     chart <- div(style = list(flexGrow = 1, marginLeft = "8px", background = background), bar)
     div(style = list(display = "flex", alignItems = "center"), label, chart)
@@ -896,23 +901,26 @@ make_reactable_df3<-function(df,participants_list){
   #df2<-df1 %>% arrange(desc(Favorable))
   g<-reactable(df,
                showSortIcon = TRUE,
+               details = colDef(
+                 name='Details', 
+  #                details =  JS("function(rowInfo) {
+  #   return 'Breakdown by question : ' + rowInfo.index +
+  #     '<pre>' + JSON.stringify(rowInfo.row, null, 2) + '</pre>'
+  # }"), html = TRUE, width = 60),
                details=function(index){
                  htmltools::div(
                    "Questions Breakdown (%)",
-                   htmltools::tags$pre(paste(capture.output(print(generate_subset_df(formatted_results,df$Category[index]))), collapse = "\n")), 
-                   align='justified' 
-                   #wrap = TRUE,resizable=TRUE,fullWidth = TRUE)
-                   #paste(capture.output(print(generate_subset_df(formatted_results,df$Category[index]))), collapse = "\n"), 
+                   htmltools::tags$pre(paste(capture.output(print(generate_subset_df(formatted_results,df[index,'Category']))), collapse = "\n")),
+                   align='justified'
                  )
-                 
-               },
+               }, width = 70),
                defaultSorted = "Favorable",
                columns = list(
                  Favorable= colDef(name = "Percent Favorability", 
                                    align = "left", 
                                    defaultSortOrder = "desc",
                                    cell = function(value) {
-                                     width <- paste0(value*100/(length(participants_list)*5), "%")
+                                     width <- paste0(value*100/(length(participants_list)/5), "%")
                                      value <- format(value, width = 9, justify = "right")
                                      bar_chart(value, width = width)
                                    },
@@ -1024,44 +1032,42 @@ deleted<-function(){
   generate_barplot(g,cat[q,1])
   #list_of_graphs[[1]]<-g
 }
-get_detailed_analysis_2<-function(df,question_type){
-  fav_labels<-c('Favourable', 'Neutral', 'Unfavorable', 'DNK')
-  y_axis_lablel<-questions_table$merged_question
+calculate_all_questions<-function(df){
+  data<-data.frame(t(convert_scores(df)))
   num_participants<-nrow(df)
-  g<-list()
-  if(question_type=='All Questions'){
-    data<-data.frame(t(convert_scores(df)))
-    data<-cbind(questions_table$Question_category,
-                #questions_table$question_desc,
-                data)
-    names(data)[1]<-'Question_category'
-    cat<-data %>% select(Question_category) %>% distinct(Question_category)
-    new_df<-data.frame(Category=NA, Response=NA,Favorable=NA, Neutral=NA,
-                       Not_Favorable=NA, DNK=NA)
-    subset_df<-data.frame() #subset data 
-    for (q in 1:nrow(cat)){
-      temp_df<-data.frame(Category=NA, Response=NA,Favorable=NA, Neutral=NA,
-                          Not_Favorable=NA, DNK=NA)
-      data_filtered<-data %>% filter(Question_category==cat[q,1]) %>%
-        select(-Question_category)
-      total<-num_participants*nrow(data_filtered)
-      summary_df<-calculate_favorability2(data_filtered)
-            temp_df[q,'Category']<-cat[q,1]
-      temp_df[q,'Favorable']<-round(summary_df$score[1]/total*100,digits=1)
-      temp_df[q,'Neutral']<-round(summary_df$score[2]/total*100,digits=1)
-      temp_df[q,'Not_Favorable']<-round(summary_df$score[3]/total*100,digits=1)
-      temp_df[q,'DNK']<-round(summary_df$score[4]/total*100,digits=1)
-      temp_df[q,'Response'][[1]]<-list(list(summary_df$percent_score))
-      new_df<-rbind(new_df,temp_df)
-      data_filtered<-data %>% filter(Question_category==cat[q,1]) %>%
-        select(-Question_category)
-      data_converted<-convert_scores(data_filtered)
-      }
-    
+  fav_labels<-c('Favourable', 'Neutral', 'Unfavorable', 'DNK')
+  y_axis_label<-questions_table$Question_desc
+  data<-cbind(questions_table$Question_category,
+              data)
+  names(data)[1]<-'Question_category'
+  cat<-data %>% select(Question_category) %>% distinct(Question_category)
+  new_df<-data.frame(Category=NA, Response=NA,Favorable=NA, Neutral=NA,
+                     Not_Favorable=NA, DNK=NA)
+  subset_df<-data.frame() #subset data 
+  for (q in 1:nrow(cat)){
+    temp_df<-data.frame(Category=NA, Response=NA,Favorable=NA, Neutral=NA,
+                        Not_Favorable=NA, DNK=NA)
+    data_filtered<-data %>% filter(Question_category==cat[q,1]) %>%
+      select(-Question_category)
+    total<-num_participants*nrow(data_filtered)
+    summary_df<-calculate_favorability2(data_filtered)
+    temp_df[q,'Category']<-cat[q,1]
+    temp_df[q,'Favorable']<-round(summary_df$score[1]/total*100,digits=1)
+    temp_df[q,'Neutral']<-round(summary_df$score[2]/total*100,digits=1)
+    temp_df[q,'Not_Favorable']<-round(summary_df$score[3]/total*100,digits=1)
+    temp_df[q,'DNK']<-round(summary_df$score[4]/total*100,digits=1)
+    temp_df[q,'Response'][[1]]<-list(summary_df$percent_score)
+    new_df<-rbind(new_df,temp_df)
     new_df2<-distinct(new_df)
     new_df3<-new_df2[2:nrow(new_df2),]
-   #g<-make_reactable_df(new_df3,participants_list)
-    g<-make_reactable_df3(new_df3,participants_list = rownames(formatted_results))
+    #data_converted<-convert_scores(data_filtered)
+  }
+  return(new_df3)
+}
+get_detailed_analysis_2<-function(df,question_type){
+  g<-list()
+  if(question_type=='All Questions'){
+    g<-make_reactable_df3(calculate_all_questions(df),participants_list = rownames(df))
     g
     }
   else{
@@ -1070,15 +1076,12 @@ get_detailed_analysis_2<-function(df,question_type){
   return(g)
   
 }
-#g<-get_detailed_analysis_2(formatted_results,question_type)
 get_questions<-function(question_type){
-  #df<-formatted_results
   data<-questions_table %>% 
     filter(Question_category==question_type) %>%
-    arrange(desc(question)) %>%
-    mutate(merged_question2=paste(question,question_desc,sep = ' | ')) %>%
+    arrange(desc(Question_number)) %>%
+    mutate(merged_question2=paste(question,Question_desc,sep = ' | ')) %>%
     select(merged_question2) 
-    #colnames(data)[1]
 return(data)
   }
 make_barplot<-function(data){
@@ -1107,6 +1110,55 @@ make_barplot<-function(data){
   text(labels=score)
   p
 return(g)
+}
+get_score_distribution_plot<-function(df){
+  df2<-cbind(df[,1],df[,3:6])
+  df3<-data.frame(Favorable=mean(df$Favorable),
+                  Neutral=mean(df$Neutral),
+                  Not_Favorable=mean(df$Not_Favorable),
+                  "Don't Know"=mean(df$DNK ))
+  df4<-rownames_to_column(data.frame(t(df3)), var = "Distribution")
+  names(df4)[2]<-'score'
+  df4<-df4[order(df4['score'],decreasing = T),]
+  g<-ggplot(df4,aes(x=reorder(Distribution,-score), y=score))+
+    geom_bar(stat='identity',width = 0.5,fill=color_palette)+ 
+    theme(axis.title.x = element_blank(),
+          axis.title.y = element_text(vjust = 0.5),
+          plot.title = element_text(hjust=0.5,color=color_palette[2]),
+          panel.grid = element_blank(),
+          panel.background = element_blank()
+         # panel.border = element_rect(color = color_palette[4])
+          )+
+    labs(title='OVERALL SCORE DISTRIBUTION',
+         y='Percentage')
+ # g
+  output_list<-list(g)
+  names(df2)[1]<-'Category'
+  df5<-pivot_longer(df2,!Category,names_to='Distribution',values_to = 'Score')
+  df6<-dplyr::arrange(df5, Distribution,desc(Score))
+  # df6$Distribution<-factor(df6$Distribution,levels = c('Favorable','Neutral',
+  #                                                      'Not_Favorable','DNK'))
+  
+  # df6$Distribution<-fct_relevel(df6$Distribution,levels = c('Favorable','Neutral',
+  #                                                      'Not_Favorable','DNK'))
+  df6_cumsum<-plyr::ddply(df6,'Category',transform,label_ypos=cumsum(Score))
+  df6$Distribution<-factor(df6$Distribution,levels = c('DNK','Not_Favorable','Neutral','Favorable'))
+  df6_cumsum$Distribution<-factor(df6$Distribution,levels = c('DNK','Not_Favorable','Neutral','Favorable'))
+  g<-ggplot(df6,aes(x=Category,y=Score,
+                    fill=Distribution))+
+    #guides(fill=guide_legend('Distribution'))+
+    geom_bar(stat='identity', width = 0.30)+
+    #geom_text(aes(y=label_ypos,label=Score))+
+    coord_flip()+
+    theme(legend.position = 'bottom',
+          panel.grid = element_blank(),
+          panel.background = element_blank(),
+          axis.title = element_blank(),
+          axis.ticks = element_blank(),
+          axis.text.x = element_blank())
+  g
+  output_list[[2]]<-g
+  return(output_list)
 }
 ## demographic analysis ----
 add_overall_score<-function(columnnames,summary_matrix) {
@@ -1242,15 +1294,12 @@ analyze_demographics<-function(demographics_table, attribute,query_type){
       }
      df3<-data.frame(df2)
      df3$parameter<-as.numeric(df3$parameter)
-      #df4<-df3[order('parameter',decreasing = TRUE),]
      df4<-df3[with(df3,order(parameter,decreasing = TRUE)),]
-     #df4<-df3 %>% dplyr::arrange(desc(parameter))
      df4$question<-factor( df4$question,levels= df4$question)
         g<-ggplot(df4,aes(x=question,y=parameter,label=parameter)) +
        geom_segment(aes(yend=0,xend=question),
-                    size=2,color=color_palette[1]) +   
-       #geom_segment(aes(yend=parameter,xend=question,x=question,y=0)) +   
-       geom_point( size=12, color=color_palette[1])+
+                    size=2,color=color_palette[4]) +   
+       geom_point( size=14, color=color_palette[4])+
           coord_flip()+
        #scale_x_discrete()+
           geom_text(color='white',size=5)+
@@ -1288,16 +1337,8 @@ analyze_demographics<-function(demographics_table, attribute,query_type){
     multi_plot
     return(multi_plot)
 }
-#p<-analyze_demographics(summary_demographics_table,'Department','category')
-
-
 demographics_participant_stats<-function(profile_revised,attribute){
   number_of_elements<-ncol(profile_revised)
-  #data<-data.frame(profile_revised)
-  #plots_list<-list()
-  #fig <- plot_ly()
-  #for (i in 1:number_of_elements){
-   # subset_data<-data.frame(attribute<-data[,i])
     subset_data<-data.frame(profile_revised[,attribute])
     names(subset_data)<-'attribute'
     summary_subset<-subset_data %>% 
@@ -1315,7 +1356,7 @@ demographics_participant_stats<-function(profile_revised,attribute){
                      insidetextfont = list(color = '#FFFFFF'),
                      hoverinfo = 'text',
                      text = ~paste(count_attribute, ' participants'),
-                     marker = list(colors = blue_gradient_color_palette,
+                     marker = list(colors = color_palette2,
                                    line = list(color = '#FFFFFF', width = 1)),
       showlegend = FALSE
                      ) 
@@ -1344,21 +1385,5 @@ get_number_of_cat_elements<-function(attribute){
   return(number_of_elements)
 }
 
-# Test functions
-
-# raw_results<-modify_raw_results(raw_results)
-# formatted_results<-generate_formatted_results(raw_results)
-# questions_list<-questions_table$question
-# questions_category<-unique(questions_table$Question_category)
-# results_scored_by_questions<-generate_scores_per_question(formatted_results)
-# scored_results<-generate_scored_results(formatted_results)
-# merged_df<-generate_merged_dataset(formatted_results,profile_revised)
-# merged_df_scored<-generate_merged_dataset(scored_results,profile_revised)
-#demographics_table<-generate_demographics_ds(profile_dataset, formatted_results)
-#summary_demographics_table<-generate_summary_demographics_ds(demographics_table)
-# favorability_plot<-summarize_favorability(formatted_results)
-# participlation_plot<-summarize_participation(scored_results)
-# ds<-convert_scores(formatted_results)
-# detailed_questions<-get_detailed_analysis(ds,'All Questions')
 
 

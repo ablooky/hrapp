@@ -1,4 +1,4 @@
-# HR App
+# HR Survey App
 # Author: Alex Looky
 # https://github.com/ablooky/hrapp
 
@@ -65,7 +65,7 @@ mytheme <- create_theme(
 )
 # Loading datasets & Global variables ----
 color_palette<-get_color_palette()
-clients_list <-get_clients_list()
+survey_year_list <-get_years_list()
 raw_results<-get_raw_data()
 profile_dataset<-get_profiles()
 participants_list<-profile_dataset[,'Participants']
@@ -103,8 +103,8 @@ summary_demographics_table_scored<-generate_summary_demographics_scored(summary_
 # Building UI 
 ## header ----
 header<-shinydashboardPlus::dashboardHeaderPlus(
-    title='HR APP',
-    enable_rightsidebar = FALSE, 
+    fixed=T, title='HR APP',
+    enable_rightsidebar = FALSE,
     tags$li(class = "dropdown",
             tags$style(HTML("@import url('//fonts.googleapis.com/css?family=Libre+Baskerville:400,700|Open+Sans:400,700|Montserrat:400,700');")
             )),
@@ -117,11 +117,24 @@ header$children[[3]]$children[[3]] <-
                     #   'background-color: ', color_palette[3],"!important; ",
                            "font-family: 'Open Sans','Libre Baskerville',Montserrat, serif;font-size: 19px;"
                            ))
-
+#left_menu = 
+#     header$children[[3]]$children[[3]] <-tagList(
+#     shinydashboardPlus::dropdownBlock(
+#         id = "selected_company",
+#         title = "Choose Company",
+#         icon = icon("sliders"),
+#         badgeStatus = NULL,
+#         selectInput('select_company_dropdown',
+#                     label='Select Company',
+#                     choices=clients_list,selected=1))
+# )
 ## sidebar ---- 
 sidebar<-dashboardSidebar(width = 220,
                           sidebarMenu(id = 'sidebar',
                                       # style = "position: relative; overflow: visible;",
+                                      selectInput('select_survey_year_dropdown',
+                                                                       label='Select Survey Year',
+                                                                     choices=survey_year_list,selected=1),
                                       menuItem(
                                       "Summary Analysis",
                                       tabName = 'summary',
@@ -154,80 +167,81 @@ downloads_tab<-tabItem(tabName='downloads',
                             DT::dataTableOutput('summary_demographics_analysis_table')
                    )
 )
-body<-dashboardBody(width = 900, #----
-                    tags$head(tags$link(rel = "stylesheet", type = "text/css", href = "custom.css")
+summary_tab<-tabItem (tabName = "summary", #----
+                      tags$br(),tags$br(),tags$br(),
+                      fluidRow(box(width=6,
+                                   title='OVERALL FAVORABILITY',
+                                   status='primary',
+                                   solidHEADER=TRUE,
+                                   plotlyOutput('summarize_favorability_plot',
+                                                height=280)),
+                               box(width=6,
+                                   title='SURVEY ENGAGEMENT',
+                                   status='primary',
+                                   solidHEADER=TRUE,
+                                   plotlyOutput('summarize_participation_plot',
+                                                height=280))
                       ),
-                    use_theme(mytheme), # <-- use the theme
-                      tabItems(
-                          tabItem (tabName = "summary",
-                                   fluidRow(box(width=6,
-                                                title='OVERALL FAVORABILITY',
-                                                status='primary',
-                                                solidHEADER=TRUE,
-                                                plotlyOutput('summarize_favorability_plot',
-                                                             height=280)),
-                                            box(width=6,
-                                                title='SURVEY ENGAGEMENT',
-                                                status='primary',
-                                                solidHEADER=TRUE,
-                                                plotlyOutput('summarize_participation_plot',
-                                                           height=280))
-                                   ),
-                                   fluidRow(box(width=6,
-                                                title='LOWEST SCORED QUESTIONS',
-                                                status='primary',
-                                                solidHeader=TRUE,
-                                                #tableOutput('lowest_scores_table')
-                                                dataTableOutput('lowest_scores_table')
-                                                ),
-                                            box(width=6,
-                                                title='HIGHEST SCORED QUESTIONS',
-                                                status='primary',
-                                                solidHeader=TRUE,
-                                                dataTableOutput('highest_scores_table')
-                                                )
-                                    )
-                                   ), 
-                          tabItem (tabName = "detailed_analysis",
-                                   selectInput("selected_question_category", label = h4("View Results by Question Category"), 
-                                               choices = new_question_category, 
-                                               selected = 1), hr(),
-                                   conditionalPanel(condition="input.selected_question_category == 'All Questions'",
-                                                    reactableOutput('detailed_questions_table')),
-                                   conditionalPanel(condition="input.selected_question_category != 'All Questions'",
-                                                    box(width=4,
-                                                        plotOutput('detailed_questions_plot', height=200)),
-                                                    box(width=8,
-                                                        tableOutput('questions_filtered_table'),height=200)
-                                                    )
-                                   
-                                   ), 
-                          tabItem (tabName = "demographic_analysis",
-                                   selectInput("selected_attribute", label = h4("Select Demographic Attribute"), 
-                                               #choices = categories_list, 
-                                               choices = categories, 
-                                               selected = 1), hr(),
-                                   fluidRow(box(width=8, 
-                                                title = 'Average Favorability Score Per Question Category and Demographic Attribute', plotOutput('attribute_category_plot',height='100%')),
-                                   box(width=4, plotlyOutput('demographic_breakdown_pie'))
-                                   #br()
-                                   )
-                                   #fluidRow(box(width=12, plotOutput('attribute_plot')))
-                                   ), 
-                          tabItem (tabName = "profiles",
-                                   selectizeInput("selected_profile", 
-                                                  label = h4("View Participant's Profile"), 
-                                                  choices = department_list, 
-                                                  selected = 0),
-                                  fluidRow(column(11,
-                                                  plotOutput('departmental_plot')),
-                                           column(1)
-                                           )                              
-                                  )
-                          
+                      fluidRow(box(width=6,
+                                   title='LOWEST SCORING QUESTIONS',
+                                   status='primary',
+                                   solidHeader=TRUE,
+                                   tableOutput('lowest_scores_table')
+                      ),
+                      box(width=6,
+                          title='HIGHEST SCORING QUESTIONS',
+                          status='primary',
+                          solidHeader=TRUE,
+                          tableOutput('highest_scores_table')
+                      )
                       )
 )
-                          
+detailed_tab<-tabItem (tabName = "detailed_analysis", #----
+                       selectInput("selected_question_category", label = h4("View Results by Question Category"), 
+                                   choices = new_question_category, 
+                                   selected = 1), hr(),
+                       conditionalPanel(condition="input.selected_question_category == 'All Questions'",
+                                        reactableOutput('detailed_questions_table'),tags$br(),tags$br(),
+                                        column(6,plotOutput('detailed_all_questions_plot1')),
+                                        column(6,plotOutput('detailed_all_questions_plot2'))),
+                       conditionalPanel(condition="input.selected_question_category != 'All Questions'",
+                                        box(width=4,
+                                            plotOutput('detailed_questions_plot', height=200)),
+                                        box(width=8,
+                                            tableOutput('questions_filtered_table'),height=200)
+                       )
+                       
+)
+demographics_tab<-tabItem (tabName = "demographic_analysis", #----
+                           selectInput("selected_attribute", label = h4("Select Demographic Attribute"),
+                                       choices = categories, 
+                                       selected = 1), hr(),
+                           fluidRow(box(width=8, 
+                                        title = 'Average Favorability Score Per Question Category and Demographic Attribute', plotOutput('attribute_category_plot',height='100%')),
+                                    box(width=4, plotlyOutput('demographic_breakdown_pie'))
+                                    #br()
+                           )
+                           #fluidRow(box(width=12, plotOutput('attribute_plot')))
+)
+profiles_tab<-tabItem (tabName = "profiles", #----
+                       selectizeInput("selected_profile", 
+                                      label = h4("View Participant's Profile"), 
+                                      choices = department_list, 
+                                      selected = 0),
+                       fluidRow(column(11,
+                                       plotOutput('departmental_plot')),
+                                column(1)
+                       )                              
+)
+body<-dashboardBody(width = 900, #----
+                    tags$head(
+                        tags$link(rel = "stylesheet", type = "text/css", href = "custom.css")),
+                    use_theme(mytheme), # <-- use the theme
+                      tabItems(summary_tab, 
+                          detailed_tab, 
+                          demographics_tab, 
+                          profiles_tab 
+                      ))
 ## ui ---- 
 ui<-shinydashboardPlus::dashboardPagePlus(title='Survey Results', 
                   #controlbar = dashboardControlbar(),
@@ -266,22 +280,18 @@ output$detailed_questions_table<-renderReactable(get_detailed_analysis_2(formatt
 output$detailed_questions_plot<-renderPlot(get_detailed_analysis_2(formatted_results,selectedQuestionCategory()))
 output$questions_filtered_table<-renderTable(get_questions(selectedQuestionCategory()),
                                              rownames=FALSE, colnames=FALSE)
-
+distribution_scores_plots<-get_score_distribution_plot(calculate_all_questions(formatted_results))
+output$detailed_all_questions_plot1<-renderPlot(distribution_scores_plots[[1]])
+output$detailed_all_questions_plot2<-renderPlot(distribution_scores_plots[[2]])
 ## Summary Analysis ----
 results_scored_by_questions<-generate_scores_per_question(formatted_results)
 scored_results<-generate_scored_results(formatted_results)
-lowest_scores<-summarize_score(formatted_results,'lowest') 
-highest_scores<-summarize_score(formatted_results,'highest')
-
+scores<-summarize_score(formatted_results) 
+highest_scores<-scores[[2]]
+lowest_scores<-scores[[1]]
 #output$lowest_scores_table<-renderTable(lowest_scores,colnames=TRUE,spacing='xs')
-output$lowest_scores_table<-renderDT(lowest_scores,
-                                     rownames = FALSE,
-                                     options=list(dom='t'),
-                                     style = 'bootstrap', class = 'table-bordered table-condensed')
-output$highest_scores_table<-renderDT(highest_scores,
-                                     rownames = FALSE,
-                                     options=list(dom='t'),
-                                     style = 'bootstrap', class = 'table-bordered table-condensed')
+output$lowest_scores_table<-shiny::renderTable(lowest_scores,rownames = FALSE,colnames=FALSE)
+output$highest_scores_table<-shiny::renderTable(highest_scores,rownames = FALSE,colnames = FALSE)
 #output$highest_scores_table<-renderTable(highest_scores,colnames=TRUE,spacing='xs')
 output$summarize_favorability_plot<-renderPlotly(summarize_favorability(formatted_results))
 output$summarize_participation_plot<-renderPlotly(summarize_participation(formatted_results))
@@ -292,11 +302,13 @@ output$demographic_breakdown_pie<-renderPlotly(demographics_participant_stats(pr
                                                                               selectedDemographicAttribute()))
 observe({ output$attribute_plot<-renderPlot(analyze_demographics(demographics_table,
                                                         selectedDemographicAttribute(),
-                                                       'question'), height= plotheight()*500)})
+                                                       'question') 
+                                            #height= plotheight()*300
+                                            )})
 #output$plot_height<-renderText(get_number_of_cat_elements(selectedDemographicAttribute()))
 observe({ output$attribute_category_plot<-renderPlot({analyze_demographics(summary_demographics_table,
                                      selectedDemographicAttribute(),
-                                     'category')}, height= plotheight()*500)})
+                                     'category')}, height= plotheight()*250)})
 #output$display_questions_table<-renderTable(questions_table[,3], rownames=TRUE,colnames=FALSE,spacing='xs')
 ## Downloads ----
 output$demographic_analysis_table<-DT::renderDT(download_demographics_table,
